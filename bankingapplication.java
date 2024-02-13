@@ -1,7 +1,23 @@
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.Scanner;
 
 class bankingapplication {
     public static void main(String[] args) {
+        Login l1 = new Login();
+        l1.loginInfo();
+    }
+}
+
+class Login {
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/bank_login";
+    private static final String DB_USER = "root";   // user name of my loacal host
+    private static final String DB_PASSWORD = "Clf@56.9fce";
+
+    public void loginInfo() {
         Scanner sc = new Scanner(System.in);
         while (true) {
             System.out.println("===== Login Page =====");
@@ -11,36 +27,42 @@ class bankingapplication {
             String userID = sc.nextLine();
             System.out.println("Enter your Password:");
             String pass = sc.nextLine();
-            try {
-                // Show "Transacting process" for 3 seconds
-                System.out
-                        .println("Logging in.............................................please wait................");
-                Thread.sleep(3000);
-            } catch (InterruptedException e) {
-                // Handle the exception if needed
+            try (Connection connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {  // try to connect a connection
+                if (isValidLogin(connection, userID, username, pass)) {
+                    // Successful login
+                    System.out.println("Login successful!\n");
+                    Account a1 = new Account(username, userID);
+                    a1.showMenue();
+                } else {
+                    // Failed login
+                    System.out.println("Login failed. Please enter correct username or password. Exiting...");
+                }
+
+            } catch (SQLException e) {
                 e.printStackTrace();
             }
-            if (isValidLogin(username, pass)) {
-                // Successful login
-                System.out.println("Login successful!\n");
-                Account a1 = new Account(username, userID);
-                a1.showMenue();
-            } else {
-                // Failed login
-                System.out.println("Login failed. please enter correct usename or password Exiting...");
-            }
-
         }
     }
 
-    public static boolean isValidLogin(String username, String pass) {
-        // Replace this logic with your actual authentication mechanism
-        return username.equals("Bimal Itani") && pass.equals("123321");
+    private static boolean isValidLogin(Connection connection, String userId, String username, String pass) {
+        String query = "SELECT * FROM Login_credintals WHERE User_Id = ? AND User_Name = ? AND Password = ?";
+        try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+            preparedStatement.setString(1, userId);
+            preparedStatement.setString(2, username);
+            preparedStatement.setString(3, pass);
+
+            try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                return resultSet.next(); // Check if there is any result
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 }
 
 class Account {
-    int balance;
+    int balance = 0;
     int previousTransaction;
     String customerNmae;
     String customerId;
@@ -52,13 +74,12 @@ class Account {
     }
 
     public void deposit(int amount) {
-        int currentBalance1 = amount + balance;
         if (amount != 0) {
-            amount = amount + balance;
             previousTransaction = amount;
             System.out.println(
-                    "Thank you for depositing " + amount + "." + " Now your current balance is: " + currentBalance1);
-
+                    "Thank you for depositing " + amount);
+            balance = balance + amount;
+            System.out.println("your current balance now is :" + balance);
         }
     }
 
@@ -75,26 +96,30 @@ class Account {
         }
         // Perform the transaction logic here (after the 3-second delay)
         System.out.println("Transaction successful :)");
-
     }
 
     public void withdraw(int amount) {
         int currentBalance2 = balance - amount;
         if (amount != 0) {
-            amount = balance - amount;
-            previousTransaction = -amount;
-            System.out.println(
-                    "Thank you for withdrawing " + amount + "." + " Now your current balance is: " + currentBalance2);
+            if (balance >= amount) {
+                previousTransaction = amount;
+                System.out.println(
+                        "Thank you for withdrawing " + amount + "." + " Now your current balance is: "
+                                + currentBalance2);
+                balance = currentBalance2 - balance;
+            } else {
+                System.out.println("insufficient  balance to withdraw please check your balance");
+            }
         }
     }
 
     public void previousTransaction() {
         if (previousTransaction > 0) {
-            System.out.println("The amount deposited is: " + previousTransaction);
+            System.out.println("Your most recent transaction was: " + previousTransaction);
         } else if (previousTransaction < 0) {
-            System.out.println("The amount withdrawn is: " + Math.abs(previousTransaction));
+            System.out.println("Your most recent transaction was: " + Math.abs(previousTransaction));
         } else {
-            System.out.println("No transaction occured. Please try again!!!");
+            System.out.println("No transaction occured recently.");
         }
     }
 
@@ -116,7 +141,7 @@ class Account {
         System.out.println("\n\tBanking Application Menu:\n");
         Scanner scanner = new Scanner(System.in);
         char option = '0';
-        System.out.println("Welcome" + customerNmae);
+        System.out.println("Welcome " + customerNmae);
         System.out.println("Your ID is: " + customerId);
         System.out.println("\n");
         System.out.println("A. Deposit");
